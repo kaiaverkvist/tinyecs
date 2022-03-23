@@ -5,21 +5,58 @@ import (
 	"sync"
 )
 
+type entityComponentLink struct {
+	entity    any
+	component *any
+}
+
 type Engine struct {
 	nextComponentID uint64
-	components      map[uint64]any
-	componentMtx    sync.RWMutex
 
-	entities []any
+	components   map[uint64]any
+	componentMtx sync.RWMutex
+
+	entities []ecsEntity
+
+	links map[uint64]entityComponentLink
+}
+
+// AddComponents adds one or more component to the entity.
+// This also updates the Engine's global component list.
+func (e *Engine) AddComponents(entity ecsEntity, components ...any) {
+	for _, component := range components {
+		e.addComponent(entity, component)
+	}
+}
+
+// DeleteComponent deletes a component from the entity.
+func (e *Engine) DeleteComponent(component any) {
+	for id, comp := range e.components {
+		if comp == component {
+			// Reset the link
+			delete(e.links, id)
+
+			//ent.components = append(ent.components[:i], ent.components[i+1:]...)
+			e.deleteComponent(id)
+		}
+	}
 }
 
 // addComponent takes a slice of components and adds it to the engine and increments the nextComponentID variable.
-func (e *Engine) addComponent(component any) uint64 {
+func (e *Engine) addComponent(entity any, component any) uint64 {
 	e.componentMtx.Lock()
 	defer e.componentMtx.Unlock()
 
 	id := e.nextComponentID
 	e.components[id] = component
+
+	//log.Printf("Setting link type on id %d to %s", id, reflect.TypeOf(entity))
+	// Set the link
+	e.links[id] = entityComponentLink{
+		entity:    entity,
+		component: &component,
+	}
+
 	e.nextComponentID++
 
 	return id
@@ -39,18 +76,18 @@ func (e *Engine) GetComponents() map[uint64]any {
 }
 
 // GetEntities returns a slice of entities held by the engine.
-func (e *Engine) GetEntities() []any {
+func (e *Engine) GetEntities() []ecsEntity {
 	return e.entities
 }
 
 // AddEntity adds an entity to the engine.
-func (e *Engine) AddEntity(entity any) {
+func (e *Engine) AddEntity(entity ecsEntity) {
 	e.entities = append(e.entities, entity)
 }
 
 // RemoveEntity takes in an entity instance and removes it from the engine.
 // Note: This is pretty slow due to the use of reflect.DeepEqual.
-func (e *Engine) RemoveEntity(entity any) {
+func (e *Engine) RemoveEntity(entity ecsEntity) {
 	for i, ent := range e.entities {
 		// TODO: Replace DeepEqual since it is pretty slow.
 		if reflect.DeepEqual(ent, entity) {
@@ -64,6 +101,7 @@ func (e *Engine) RemoveEntity(entity any) {
 // This should be the entry point for the tinyecs library.
 func NewEngine() Engine {
 	return Engine{
+		links:      make(map[uint64]entityComponentLink),
 		components: make(map[uint64]any),
 	}
 }
@@ -71,6 +109,8 @@ func NewEngine() Engine {
 // Each is a generic function that iterates over the engine's components
 // and runs the function argument with arguments being the id of the
 // component along with the component instance of type T.
+// Note that Each does not provide the actual entity used. Use EachEntity
+// instead for this purpose.
 //
 // 		tinyecs.Each[Timer](&e, func(id uint64, obj Timer) {
 //			obj.currentTime += 0.35
@@ -78,7 +118,7 @@ func NewEngine() Engine {
 //		})
 //
 // The example above illustrates a basic use case where one updates a variable on a component, using the Set function.
-func Each[T any](engine *Engine, f func(id uint64, obj T)) uint64 {
+func Each[T any](engine *Engine, f func(id uint64, component T)) uint64 {
 
 	// Store a counter of objects touched which will be returned out of the function.
 	var counter uint64
@@ -94,6 +134,22 @@ func Each[T any](engine *Engine, f func(id uint64, obj T)) uint64 {
 	return counter
 }
 
+func EachEntity[E any, C any](engine *Engine, f func(entity E, component C)) uint64 {
+	var counter uint64
+
+	for _, link := range engine.links {
+		component := *link.component
+		if c, ok := component.(C); ok {
+			if e, entOk := link.entity.(E); entOk {
+				counter++
+				f(e, c)
+			}
+		}
+	}
+
+	return counter
+}
+
 // Set takes in an engine instance and updates a component with the id specified.
 func Set(engine *Engine, id uint64, component any) {
 	engine.componentMtx.Lock()
@@ -102,34 +158,25 @@ func Set(engine *Engine, id uint64, component any) {
 	engine.components[id] = component
 }
 
+type ecsEntity interface {
+	//AddComponents(engine *Engine, components ...any)
+	GetComponents(engine *Engine) []uint64
+	//DeleteComponent(engine *Engine, id uint64)
+}
+
 // Entity is a collection of components.
 // Consumers should extend this by embedding the struct.
-type Entity struct {
-	components []uint64
-}
-
-// AddComponents adds one or more component to the entity.
-// This also updates the Engine's global component list.
-func (ent *Entity) AddComponents(engine *Engine, components ...any) {
-	for _, component := range components {
-		id := engine.addComponent(component)
-		ent.components = append(ent.components, id)
-	}
-}
+type Entity struct{}
 
 // GetComponents returns a list of component IDs associated with the entity.
-func (ent *Entity) GetComponents() []uint64 {
-	return ent.components
-}
+func (ent Entity) GetComponents(engine *Engine) []uint64 {
+	var components []uint64
 
-// DeleteComponent deletes a component from the entity.
-func (ent *Entity) DeleteComponent(engine *Engine, id uint64) {
-	for i, componentId := range ent.components {
-		if componentId == id {
-			ent.components = append(ent.components[:i], ent.components[i+1:]...)
-			engine.deleteComponent(id)
-
-			return
+	for i, link := range engine.links {
+		if ent == link.entity {
+			components = append(components, i)
 		}
 	}
+
+	return components
 }

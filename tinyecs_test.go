@@ -21,20 +21,23 @@ type velocity struct {
 
 type testEntity struct {
 	tinyecs.Entity
+
+	name string
 }
 
 func Test_BasicInitialization(t *testing.T) {
 	e := tinyecs.NewEngine()
 
 	entity := testEntity{}
-	entity.AddComponents(
-		&e,
+	e.AddComponents(
+		entity,
+
 		floater{f: 1.0},
 		velocity{v: 5.0},
 		floater{1},
 	)
 
-	e.AddEntity(entity)
+	e.AddEntity(&entity)
 
 	assert.Len(t, e.GetComponents(), 3)
 }
@@ -43,18 +46,18 @@ func Test_RemoveComponentById(t *testing.T) {
 	e := tinyecs.NewEngine()
 
 	entity := testEntity{}
-	entity.AddComponents(
-		&e,
+	e.AddComponents(
+		entity,
+
 		floater{f: 1.0},
 		velocity{v: 5.0},
 		floater{1},
 	)
-
-	e.AddEntity(entity)
+	e.AddEntity(&entity)
 
 	assert.Len(t, e.GetComponents(), 3)
 
-	entity.DeleteComponent(&e, uint64(len(entity.GetComponents()) - 1))
+	e.DeleteComponent(e.GetComponents()[1])
 
 	assert.Len(t, e.GetComponents(), 2)
 }
@@ -66,14 +69,15 @@ func TestEngine_AddEntity(t *testing.T) {
 	assert.Len(t, e.GetEntities(), 0)
 
 	entity := testEntity{}
-	entity.AddComponents(
-		&e,
+	e.AddComponents(
+		entity,
+
 		floater{f: 1.0},
 		velocity{v: 5.0},
 		floater{1},
 	)
 
-	e.AddEntity(entity)
+	e.AddEntity(&entity)
 
 	assert.Len(t, e.GetEntities(), 1)
 }
@@ -85,35 +89,36 @@ func TestEngine_RemoveEntity(t *testing.T) {
 	assert.Len(t, e.GetEntities(), 0)
 
 	entity := testEntity{}
-	entity.AddComponents(
-		&e,
+	e.AddComponents(
+		entity,
+
 		floater{f: 1.0},
 		velocity{v: 5.0},
 		floater{1},
 	)
 
-	e.AddEntity(entity)
+	e.AddEntity(&entity)
 
 	assert.Len(t, e.GetEntities(), 1)
 
-	e.RemoveEntity(entity)
+	e.RemoveEntity(&entity)
 
 	assert.Len(t, e.GetEntities(), 0)
 }
-
 
 func Test_EachAndUpdateInstances(t *testing.T) {
 	e := tinyecs.NewEngine()
 
 	entity := testEntity{}
-	entity.AddComponents(
-		&e,
+	e.AddComponents(
+		entity,
+
 		floater{f: 1.0},
 		velocity{v: 5.0},
 		floater{1},
 	)
 
-	e.AddEntity(entity)
+	e.AddEntity(&entity)
 
 	tinyecs.Each[floater](&e, func(id uint64, obj floater) {
 		assert.Equal(t, 1.0, obj.f)
@@ -130,19 +135,37 @@ func Test_EntityWithComponents(t *testing.T) {
 	e := tinyecs.NewEngine()
 
 	entity := testEntity{}
-	entity.AddComponents(
-		&e,
+	e.AddComponents(
+		entity,
+
 		velocity{},
 		playerData{name: "test", health: 100.0},
 	)
-	e.AddEntity(entity)
+	e.AddEntity(&entity)
 
 	c := tinyecs.Each[velocity](&e, func(id uint64, obj velocity) {})
+	assert.Equal(t, uint64(1), c)
 
 	tinyecs.Each[playerData](&e, func(id uint64, obj playerData) {
 		assert.Equal(t, "test", obj.name)
 	})
-
-	assert.Equal(t, uint64(1), c)
 }
 
+func Test_EachEntity(t *testing.T) {
+	e := tinyecs.NewEngine()
+
+	entity := testEntity{name: "a1"}
+	e.AddComponents(
+		entity,
+
+		velocity{},
+		playerData{name: "test", health: 100.0},
+	)
+	e.AddEntity(&entity)
+
+	c := tinyecs.EachEntity[testEntity, velocity](&e, func(entity testEntity, component velocity) {
+		assert.Equal(t, entity.name, "a1")
+	})
+	assert.Equal(t, uint64(1), c)
+
+}
