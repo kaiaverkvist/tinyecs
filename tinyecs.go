@@ -5,11 +5,13 @@ import (
 	"sync"
 )
 
+// entityComponentLink is used to store a relationship between an entity and a component.
 type entityComponentLink struct {
 	entity    any
 	component *any
 }
 
+// Engine represents the tinyecs engine itself.
 type Engine struct {
 	nextComponentID uint64
 
@@ -29,7 +31,7 @@ func (e *Engine) AddComponents(entity ecsEntity, components ...any) {
 	}
 }
 
-// DeleteComponent deletes a component from the entity.
+// DeleteComponent deletes a component.
 func (e *Engine) DeleteComponent(component any) {
 	for id, comp := range e.components {
 		if comp == component {
@@ -50,15 +52,13 @@ func (e *Engine) addComponent(entity any, component any) uint64 {
 	id := e.nextComponentID
 	e.components[id] = component
 
-	//log.Printf("Setting link type on id %d to %s", id, reflect.TypeOf(entity))
-	// Set the link
+	// Set the link relationship.
 	e.links[id] = entityComponentLink{
 		entity:    entity,
 		component: &component,
 	}
 
 	e.nextComponentID++
-
 	return id
 }
 
@@ -134,6 +134,11 @@ func Each[T any](engine *Engine, f func(id uint64, component T)) uint64 {
 	return counter
 }
 
+// EachEntity is a generic function that iterates over the components belonging to entity E as component C.
+//
+// 		tinyecs.Each[MyEntity, Timer](&e, func(entity MyEntity, component Timer) {
+//			log.Println("MyEntity: ", entity)
+//		})
 func EachEntity[E any, C any](engine *Engine, f func(entity E, component C)) uint64 {
 	var counter uint64
 
@@ -158,10 +163,9 @@ func Set(engine *Engine, id uint64, component any) {
 	engine.components[id] = component
 }
 
+// ecsEntity is an internal type used to represent an entity.
 type ecsEntity interface {
-	//AddComponents(engine *Engine, components ...any)
 	GetComponents(engine *Engine) []uint64
-	//DeleteComponent(engine *Engine, id uint64)
 }
 
 // Entity is a collection of components.
