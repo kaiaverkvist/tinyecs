@@ -142,12 +142,12 @@ func Each[T any](engine *Engine, f func(id uint64, component T)) uint64 {
 func EachEntity[E any, C any](engine *Engine, f func(entity E, component C)) uint64 {
 	var counter uint64
 
-	for _, link := range engine.links {
+	for idx, link := range engine.links {
 		component := *link.component
-		if c, ok := component.(C); ok {
+		if _, ok := component.(C); ok {
 			if e, entOk := link.entity.(E); entOk {
 				counter++
-				f(e, c)
+				f(e, engine.components[idx])
 			}
 		}
 	}
