@@ -147,7 +147,7 @@ func EachEntity[E any, C any](engine *Engine, f func(entity E, component C)) uin
 		if _, ok := component.(C); ok {
 			if e, entOk := link.entity.(E); entOk {
 				counter++
-				f(e, engine.components[idx])
+				f(e, engine.components[idx].(C))
 			}
 		}
 	}
