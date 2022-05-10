@@ -7,7 +7,9 @@ Entity Component System written in Golang using generics.
 e := tinyecs.NewEngine()
 
 // Define and set up a new testEntity.
-entity := testEntity{}
+entity := testEntity{
+	tinyecs.Entity
+}
 
 // Add some components along with passing in the engine instance.
 entity.AddComponents(
