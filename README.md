@@ -3,13 +3,15 @@ Entity Component System written in Golang using generics.
 
 ## Basic usage
 ```go
+type testEntity struct {
+	tinyecs.Entity
+}
+
 // Initialize a new instance of the ECS engine.
 e := tinyecs.NewEngine()
 
 // Define and set up a new testEntity.
-entity := testEntity{
-	tinyecs.Entity
-}
+entity := testEntity{}
 
 // Add some components along with passing in the engine instance.
 entity.AddComponents(
